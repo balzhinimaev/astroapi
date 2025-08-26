@@ -71,9 +71,12 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Prepare remote directory
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'mkdir -p ~/newbotksenia'
       - name: Copy compose to VPS
         run: |
-          scp -o StrictHostKeyChecking=no docker-compose.prod.yml ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/newbotksenia/docker-compose.yml
+          scp -o StrictHostKeyChecking=no docker-compose.prod.yml ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/newbotksenia/docker-compose.yml
       - name: Deploy on VPS
         env:
           APP_IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
@@ -85,8 +88,8 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} '
             set -e
-            mkdir -p /opt/newbotksenia
-            cd /opt/newbotksenia
+            mkdir -p ~/newbotksenia
+            cd ~/newbotksenia
             echo "APP_IMAGE=${APP_IMAGE}" > .env
             echo "MONGO_URI=${MONGO_URI}" >> .env
             echo "N8N_TOKEN=${N8N_TOKEN}" >> .env
