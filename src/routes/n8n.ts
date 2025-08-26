@@ -96,6 +96,39 @@ router.post('/users/name', requireN8nToken, async (req: Request, res: Response) 
   }
 });
 
+router.post('/users/status', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { telegramId, status } = req.body as {
+      telegramId?: string | number;
+      status?: 'idle' | 'awaiting_name' | 'awaiting_birthdate' | 'awaiting_city';
+    };
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+    if (!status) {
+      res.status(400).json({ error: 'status is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const updated = await UserModel.findOneAndUpdate(
+      { telegramId: telegramIdStr },
+      {
+        $set: { status, statusUpdatedAt: new Date() },
+        $setOnInsert: { telegramId: telegramIdStr },
+      },
+      { new: true, upsert: true }
+    ).lean();
+
+    res.status(200).json({ ok: true, user: updated });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/users/status', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 export default router;
 
 

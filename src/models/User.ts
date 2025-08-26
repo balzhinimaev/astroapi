@@ -4,6 +4,13 @@ const userSchema = new Schema(
   {
     telegramId: { type: String, required: true, unique: true, index: true },
     name: { type: String, required: false },
+    status: {
+      type: String,
+      enum: ['idle', 'awaiting_name', 'awaiting_birthdate', 'awaiting_city'],
+      default: 'idle',
+      required: false,
+    },
+    statusUpdatedAt: { type: Date, required: false },
     lastGeocode: {
       provider: { type: String, enum: ['yandex'], required: false },
       query: { type: String, required: false },
