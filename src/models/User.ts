@@ -4,6 +4,7 @@ const userSchema = new Schema(
   {
     telegramId: { type: String, required: true, unique: true, index: true },
     name: { type: String, required: false },
+    birthDate: { type: String, required: false },
     status: {
       type: String,
       enum: ['registered', 'idle', 'awaiting_name', 'awaiting_birthdate', 'awaiting_city'],

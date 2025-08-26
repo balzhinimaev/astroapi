@@ -155,6 +155,39 @@ router.get('/users/:telegramId', requireN8nToken, async (req: Request, res: Resp
   }
 });
 
+router.post('/users/birthdate', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { telegramId, birthDate } = req.body as { telegramId?: string | number; birthDate?: string };
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+    if (!birthDate || !birthDate.trim()) {
+      res.status(400).json({ error: 'birthDate is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const exists = await UserModel.findOne({ telegramId: telegramIdStr }).lean();
+    if (!exists) {
+      res.status(404).json({ error: 'user not found' });
+      return;
+    }
+
+    const updated = await UserModel.findOneAndUpdate(
+      { telegramId: telegramIdStr },
+      { $set: { birthDate: birthDate.trim() } },
+      { new: true }
+    ).lean();
+
+    res.status(200).json({ ok: true, user: updated });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/users/birthdate', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 export default router;
 
 
