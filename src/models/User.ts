@@ -1,0 +1,29 @@
+import { Schema, model, InferSchemaType } from 'mongoose';
+
+const userSchema = new Schema(
+  {
+    telegramId: { type: String, required: true, unique: true, index: true },
+    lastGeocode: {
+      provider: { type: String, enum: ['yandex'], required: false },
+      query: { type: String, required: false },
+      lat: { type: Number, required: false },
+      lon: { type: Number, required: false },
+      name: { type: String, required: false },
+      precision: { type: String, required: false },
+      address: { type: String, required: false },
+    },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { versionKey: false }
+);
+
+userSchema.pre('save', function updateTimestamp(next) {
+  this.set('updatedAt', new Date());
+  next();
+});
+
+export type UserDocument = InferSchemaType<typeof userSchema> & { _id: unknown };
+export const UserModel = model('User', userSchema);
+
+
