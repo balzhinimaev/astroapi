@@ -3,6 +3,7 @@ import { Schema, model, InferSchemaType } from 'mongoose';
 const userSchema = new Schema(
   {
     telegramId: { type: String, required: true, unique: true, index: true },
+    name: { type: String, required: false },
     lastGeocode: {
       provider: { type: String, enum: ['yandex'], required: false },
       query: { type: String, required: false },

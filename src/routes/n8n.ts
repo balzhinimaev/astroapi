@@ -66,6 +66,37 @@ router.post('/geocode', requireN8nToken, async (req: Request, res: Response) => 
   }
 });
 
+router.post('/users/name', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { telegramId, name } = req.body as { telegramId?: string | number; name?: string };
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+    if (!name || !name.trim()) {
+      res.status(400).json({ error: 'name is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const updated = await UserModel.findOneAndUpdate(
+      { telegramId: telegramIdStr },
+      {
+        $set: { name: name.trim() },
+        $setOnInsert: { telegramId: telegramIdStr },
+      },
+      { new: true, upsert: true }
+    ).lean();
+
+    res.status(200).json({ ok: true, user: updated });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/users/name', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 export default router;
+
 
 
