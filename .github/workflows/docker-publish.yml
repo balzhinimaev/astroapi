@@ -60,4 +60,52 @@ jobs:
             -H 'Content-Type: application/json' \
             -d '{"chat_id":"'"${TELEGRAM_CHAT_ID}"'","text":"Docker publish FAIL: '${{ github.repository }}' @ '${{ github.ref_name }}'"}'
 
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Copy compose to VPS
+        run: |
+          scp -o StrictHostKeyChecking=no docker-compose.prod.yml ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/newbotksenia/docker-compose.yml
+      - name: Deploy on VPS
+        env:
+          APP_IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          N8N_TOKEN: ${{ secrets.N8N_TOKEN }}
+          YANDEX_GEOCODER_API_KEY: ${{ secrets.YANDEX_GEOCODER_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} '
+            set -e
+            mkdir -p /opt/newbotksenia
+            cd /opt/newbotksenia
+            echo "APP_IMAGE=${APP_IMAGE}" > .env
+            echo "MONGO_URI=${MONGO_URI}" >> .env
+            echo "N8N_TOKEN=${N8N_TOKEN}" >> .env
+            echo "YANDEX_GEOCODER_API_KEY=${YANDEX_GEOCODER_API_KEY}" >> .env
+            echo "TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}" >> .env
+            echo "TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}" >> .env
+            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            docker compose down
+            docker compose pull || true
+            docker compose up -d
+          '
+      - name: Notify Telegram (deploy)
+        if: success()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d '{"chat_id":"'"${TELEGRAM_CHAT_ID}"'","text":"Deploy OK: '${{ github.repository }}' на VPS (порт 7001)"}'
+
 
