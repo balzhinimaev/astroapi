@@ -77,29 +77,36 @@ jobs:
       - name: Copy compose to VPS
         run: |
           scp -o StrictHostKeyChecking=no docker-compose.prod.yml ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/newbotksenia/docker-compose.yml
-      - name: Deploy on VPS
+      - name: Create env file locally
         env:
-          APP_IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          APP_IMAGE: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
           N8N_TOKEN: ${{ secrets.N8N_TOKEN }}
           YANDEX_GEOCODER_API_KEY: ${{ secrets.YANDEX_GEOCODER_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          cat > vps.env << EOF
+APP_IMAGE=${APP_IMAGE}
+MONGO_URI=${MONGO_URI}
+N8N_TOKEN=${N8N_TOKEN}
+YANDEX_GEOCODER_API_KEY=${YANDEX_GEOCODER_API_KEY}
+TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+EOF
+      - name: Upload env to VPS
+        run: |
+          scp -o StrictHostKeyChecking=no vps.env ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/newbotksenia/.env
+      - name: Deploy on VPS
+        run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} '
             set -e
             mkdir -p ~/newbotksenia
             cd ~/newbotksenia
-            echo "APP_IMAGE=${APP_IMAGE}" > .env
-            echo "MONGO_URI=${MONGO_URI}" >> .env
-            echo "N8N_TOKEN=${N8N_TOKEN}" >> .env
-            echo "YANDEX_GEOCODER_API_KEY=${YANDEX_GEOCODER_API_KEY}" >> .env
-            echo "TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}" >> .env
-            echo "TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}" >> .env
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
-            docker compose down
-            docker compose pull || true
-            docker compose up -d
+            docker compose --env-file .env down || true
+            docker compose --env-file .env pull || true
+            docker compose --env-file .env up -d
           '
       - name: Notify Telegram (deploy)
         if: success()
