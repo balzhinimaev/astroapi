@@ -65,7 +65,7 @@ router.post('/geocode', requireN8nToken, async (req: Request, res: Response) => 
     }).formatToParts(now);
     const off = tzDate.find((p) => p.type === 'timeZoneName')?.value || 'UTC+0';
     const sign = off.includes('-') ? -1 : 1;
-    const match = off.match(/UTC[+-](\d{1,2})(?::(\d{2}))?/);
+    const match = off.match(/(?:UTC|GMT)[+-](\d{1,2})(?::(\d{2}))?/);
     let tzone = 0;
     if (match) {
       const h = parseInt(match[1], 10) || 0;
@@ -435,7 +435,7 @@ router.post('/users/partner/geocode', requireN8nToken, async (req: Request, res:
     }).formatToParts(now);
     const off = tzDate.find((p) => p.type === 'timeZoneName')?.value || 'UTC+0';
     const sign = off.includes('-') ? -1 : 1;
-    const match = off.match(/UTC[+-](\d{1,2})(?::(\d{2}))?/);
+    const match = off.match(/(?:UTC|GMT)[+-](\d{1,2})(?::(\d{2}))?/);
     let tzone = 0;
     if (match) {
       const h = parseInt(match[1], 10) || 0;
