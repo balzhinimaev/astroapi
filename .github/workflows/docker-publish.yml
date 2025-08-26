@@ -86,14 +86,14 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          cat > vps.env << EOF
-APP_IMAGE=${APP_IMAGE}
-MONGO_URI=${MONGO_URI}
-N8N_TOKEN=${N8N_TOKEN}
-YANDEX_GEOCODER_API_KEY=${YANDEX_GEOCODER_API_KEY}
-TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-EOF
+          {
+            echo "APP_IMAGE=${APP_IMAGE}";
+            echo "MONGO_URI=${MONGO_URI}";
+            echo "N8N_TOKEN=${N8N_TOKEN}";
+            echo "YANDEX_GEOCODER_API_KEY=${YANDEX_GEOCODER_API_KEY}";
+            echo "TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}";
+            echo "TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}";
+          } > vps.env
       - name: Upload env to VPS
         run: |
           scp -o StrictHostKeyChecking=no vps.env ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/newbotksenia/.env
