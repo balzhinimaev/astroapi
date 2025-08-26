@@ -7,6 +7,7 @@ const userSchema = new Schema(
     birthDate: { type: String, required: false },
     birthHour: { type: Number, required: false, min: 0, max: 23 },
     birthMinute: { type: Number, required: false, min: 0, max: 59 },
+    isProfileComplete: { type: Boolean, required: false, default: false },
     partner: {
       birthDate: { type: String, required: false },
       birthHour: { type: Number, required: false, min: 0, max: 23 },
