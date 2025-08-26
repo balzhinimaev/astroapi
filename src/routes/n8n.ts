@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { requireN8nToken } from '../middleware/authHeader';
 import { UserModel } from '../models/User';
 import { geocodePlace } from '../services/yandexGeocoder';
+import tzLookup from 'tz-lookup';
 
 const router = Router();
 
@@ -54,13 +55,31 @@ router.post('/geocode', requireN8nToken, async (req: Request, res: Response) => 
       res.status(404).json({ error: 'user not found' });
       return;
     }
+    const timeZone = tzLookup(result.lat, result.lon);
+    // вычисляем смещение в часах через Intl API (UTC offset, включая половинные зоны)
+    const now = new Date();
+    const tzDate = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      timeZoneName: 'shortOffset',
+      hour: '2-digit',
+    }).formatToParts(now);
+    const off = tzDate.find((p) => p.type === 'timeZoneName')?.value || 'UTC+0';
+    const sign = off.includes('-') ? -1 : 1;
+    const match = off.match(/UTC[+-](\d{1,2})(?::(\d{2}))?/);
+    let tzone = 0;
+    if (match) {
+      const h = parseInt(match[1], 10) || 0;
+      const m = parseInt(match[2] || '0', 10) || 0;
+      tzone = sign * (h + m / 60);
+    }
+
     await UserModel.findOneAndUpdate(
       { telegramId: telegramIdStr },
-      { $set: { lastGeocode: result } },
+      { $set: { lastGeocode: { ...result, timeZone, tzone } } },
       { new: true }
     ).lean();
 
-    res.status(200).json({ ok: true, ...result });
+    res.status(200).json({ ok: true, ...result, timeZone, tzone });
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error in POST /n8n/geocode', error);

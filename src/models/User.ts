@@ -20,6 +20,8 @@ const userSchema = new Schema(
       name: { type: String, required: false },
       precision: { type: String, required: false },
       address: { type: String, required: false },
+      timeZone: { type: String, required: false },
+      tzone: { type: Number, required: false },
     },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
