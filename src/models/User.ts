@@ -6,8 +6,8 @@ const userSchema = new Schema(
     name: { type: String, required: false },
     status: {
       type: String,
-      enum: ['idle', 'awaiting_name', 'awaiting_birthdate', 'awaiting_city'],
-      default: 'idle',
+      enum: ['registered', 'idle', 'awaiting_name', 'awaiting_birthdate', 'awaiting_city'],
+      default: 'registered',
       required: false,
     },
     statusUpdatedAt: { type: Date, required: false },
