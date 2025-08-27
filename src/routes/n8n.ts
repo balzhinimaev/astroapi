@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { requireN8nToken } from '../middleware/authHeader';
 import { UserModel } from '../models/User';
 import { geocodePlace } from '../services/yandexGeocoder';
+import { yesNoTarot } from '../services/astrologyApi';
 import tzLookup from 'tz-lookup';
 
 const router = Router();
@@ -676,6 +677,20 @@ router.post('/users/subscription/cancel', requireN8nToken, async (req: Request, 
     // eslint-disable-next-line no-console
     console.error('Error in POST /n8n/users/subscription/cancel', error);
     res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+router.post('/astro/yes-no-tarot', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { language } = req.body as { language?: string };
+    const randomTarotId = Math.floor(Math.random() * 22) + 1; // 1..22
+    const lang = (language && String(language).trim()) || 'russian';
+    const response = await yesNoTarot(randomTarotId, lang);
+    res.status(200).json({ ok: true, tarotId: randomTarotId, result: response });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/astro/yes-no-tarot', error);
+    res.status(500).json({ error: 'External API error' });
   }
 });
 
