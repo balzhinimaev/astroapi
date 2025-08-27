@@ -85,6 +85,8 @@ jobs:
           YANDEX_GEOCODER_API_KEY: ${{ secrets.YANDEX_GEOCODER_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ASTROLOGY_API_USER_ID: ${{ secrets.ASTROLOGY_API_USER_ID }}
+          ASTROLOGY_API_KEY: ${{ secrets.ASTROLOGY_API_KEY }}
         run: |
           {
             echo "APP_IMAGE=${APP_IMAGE}";
@@ -93,6 +95,8 @@ jobs:
             echo "YANDEX_GEOCODER_API_KEY=${YANDEX_GEOCODER_API_KEY}";
             echo "TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}";
             echo "TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}";
+            echo "ASTROLOGY_API_USER_ID=${ASTROLOGY_API_USER_ID}";
+            echo "ASTROLOGY_API_KEY=${ASTROLOGY_API_KEY}";
           } > vps.env
       - name: Upload env to VPS
         run: |
