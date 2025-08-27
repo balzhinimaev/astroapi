@@ -499,21 +499,13 @@ router.post('/users/subscription', requireN8nToken, async (req: Request, res: Re
   try {
     const {
       telegramId,
-      status,
-      startDate,
-      endDate,
       type,
       paymentMethod,
-      autoRenew,
       paymentId,
     } = req.body as {
       telegramId?: string | number;
-      status?: 'active' | 'inactive' | 'cancelled' | 'expired' | 'trial';
-      startDate?: string;
-      endDate?: string;
       type?: 'monthly' | 'yearly' | 'trial' | 'lifetime';
       paymentMethod?: string;
-      autoRenew?: boolean | string;
       paymentId?: string;
     };
 
@@ -531,27 +523,14 @@ router.post('/users/subscription', requireN8nToken, async (req: Request, res: Re
 
     const updateData: any = {};
 
-    if (status) {
-      updateData['subscription.status'] = status;
-    }
-
-    if (startDate) {
-      const parsedStartDate = new Date(startDate);
-      if (isNaN(parsedStartDate.getTime())) {
-        res.status(400).json({ error: 'Invalid startDate format' });
-        return;
-      }
-      updateData['subscription.startDate'] = parsedStartDate;
-    }
-
-    if (endDate) {
-      const parsedEndDate = new Date(endDate);
-      if (isNaN(parsedEndDate.getTime())) {
-        res.status(400).json({ error: 'Invalid endDate format' });
-        return;
-      }
-      updateData['subscription.endDate'] = parsedEndDate;
-    }
+    // Принудительные значения подписки: активная, месяц с текущего момента, без автопродления
+    const start = new Date();
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + 1);
+    updateData['subscription.status'] = 'active';
+    updateData['subscription.startDate'] = start;
+    updateData['subscription.endDate'] = end;
+    updateData['subscription.autoRenew'] = false;
 
     if (type) {
       updateData['subscription.type'] = type;
@@ -561,20 +540,8 @@ router.post('/users/subscription', requireN8nToken, async (req: Request, res: Re
       updateData['subscription.paymentMethod'] = paymentMethod;
     }
 
-    if (autoRenew !== undefined) {
-      const autoRenewValue = typeof autoRenew === 'string'
-        ? ['true', '1', 'yes', 'on'].includes(autoRenew.toLowerCase())
-        : Boolean(autoRenew);
-      updateData['subscription.autoRenew'] = autoRenewValue;
-    }
-
     if (paymentId !== undefined) {
       updateData['subscription.paymentId'] = paymentId;
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      res.status(400).json({ error: 'At least one subscription field must be provided' });
-      return;
     }
 
     const updated = await UserModel.findOneAndUpdate(
