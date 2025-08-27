@@ -8,6 +8,25 @@ const userSchema = new Schema(
     birthHour: { type: Number, required: false, min: 0, max: 23 },
     birthMinute: { type: Number, required: false, min: 0, max: 59 },
     isProfileComplete: { type: Boolean, required: false, default: false },
+    subscription: {
+      status: {
+        type: String,
+        enum: ['active', 'inactive', 'cancelled', 'expired', 'trial'],
+        default: 'inactive',
+        required: false,
+      },
+      startDate: { type: Date, required: false },
+      endDate: { type: Date, required: false },
+      type: {
+        type: String,
+        enum: ['monthly', 'yearly', 'trial', 'lifetime'],
+        required: false,
+      },
+      paymentMethod: { type: String, required: false },
+      autoRenew: { type: Boolean, required: false, default: true },
+      cancelledAt: { type: Date, required: false },
+      paymentId: { type: String, required: false },
+    },
     partner: {
       birthDate: { type: String, required: false },
       birthHour: { type: Number, required: false, min: 0, max: 23 },

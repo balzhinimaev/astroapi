@@ -494,6 +494,191 @@ router.post('/users/partner/geocode', requireN8nToken, async (req: Request, res:
   }
 });
 
+router.post('/users/subscription', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const {
+      telegramId,
+      status,
+      startDate,
+      endDate,
+      type,
+      paymentMethod,
+      autoRenew,
+      paymentId,
+    } = req.body as {
+      telegramId?: string | number;
+      status?: 'active' | 'inactive' | 'cancelled' | 'expired' | 'trial';
+      startDate?: string;
+      endDate?: string;
+      type?: 'monthly' | 'yearly' | 'trial' | 'lifetime';
+      paymentMethod?: string;
+      autoRenew?: boolean | string;
+      paymentId?: string;
+    };
+
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const exists = await UserModel.findOne({ telegramId: telegramIdStr }).lean();
+    if (!exists) {
+      res.status(404).json({ error: 'user not found' });
+      return;
+    }
+
+    const updateData: any = {};
+
+    if (status) {
+      updateData['subscription.status'] = status;
+    }
+
+    if (startDate) {
+      const parsedStartDate = new Date(startDate);
+      if (isNaN(parsedStartDate.getTime())) {
+        res.status(400).json({ error: 'Invalid startDate format' });
+        return;
+      }
+      updateData['subscription.startDate'] = parsedStartDate;
+    }
+
+    if (endDate) {
+      const parsedEndDate = new Date(endDate);
+      if (isNaN(parsedEndDate.getTime())) {
+        res.status(400).json({ error: 'Invalid endDate format' });
+        return;
+      }
+      updateData['subscription.endDate'] = parsedEndDate;
+    }
+
+    if (type) {
+      updateData['subscription.type'] = type;
+    }
+
+    if (paymentMethod !== undefined) {
+      updateData['subscription.paymentMethod'] = paymentMethod;
+    }
+
+    if (autoRenew !== undefined) {
+      const autoRenewValue = typeof autoRenew === 'string'
+        ? ['true', '1', 'yes', 'on'].includes(autoRenew.toLowerCase())
+        : Boolean(autoRenew);
+      updateData['subscription.autoRenew'] = autoRenewValue;
+    }
+
+    if (paymentId !== undefined) {
+      updateData['subscription.paymentId'] = paymentId;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      res.status(400).json({ error: 'At least one subscription field must be provided' });
+      return;
+    }
+
+    const updated = await UserModel.findOneAndUpdate(
+      { telegramId: telegramIdStr },
+      { $set: updateData },
+      { new: true }
+    ).lean();
+
+    res.status(200).json({ ok: true, user: updated });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/users/subscription', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+router.get('/users/:telegramId/subscription', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const telegramId = req.params.telegramId;
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    const user = await UserModel.findOne(
+      { telegramId: String(telegramId) },
+      { subscription: 1, telegramId: 1 }
+    ).lean();
+
+    if (!user) {
+      res.status(404).json({ ok: false, exists: false });
+      return;
+    }
+
+    const now = new Date();
+    const subscription = user.subscription || {};
+
+    // Check if subscription is expired
+    if (subscription.status === 'active' && subscription.endDate && subscription.endDate < now) {
+      await UserModel.findOneAndUpdate(
+        { telegramId: String(telegramId) },
+        { $set: { 'subscription.status': 'expired' } }
+      );
+      subscription.status = 'expired';
+    }
+
+    res.status(200).json({
+      ok: true,
+      exists: true,
+      subscription: {
+        status: subscription.status || 'inactive',
+        startDate: subscription.startDate,
+        endDate: subscription.endDate,
+        type: subscription.type,
+        paymentMethod: subscription.paymentMethod,
+        autoRenew: subscription.autoRenew !== false,
+        cancelledAt: subscription.cancelledAt,
+        paymentId: subscription.paymentId,
+        isActive: subscription.status === 'active' && (!subscription.endDate || subscription.endDate >= now),
+      }
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in GET /n8n/users/:telegramId/subscription', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+router.post('/users/subscription/cancel', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { telegramId } = req.body as { telegramId?: string | number };
+
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const exists = await UserModel.findOne({ telegramId: telegramIdStr }).lean();
+    if (!exists) {
+      res.status(404).json({ error: 'user not found' });
+      return;
+    }
+
+    const now = new Date();
+    const updated = await UserModel.findOneAndUpdate(
+      { telegramId: telegramIdStr },
+      {
+        $set: {
+          'subscription.status': 'cancelled',
+          'subscription.cancelledAt': now,
+          'subscription.autoRenew': false,
+        }
+      },
+      { new: true }
+    ).lean();
+
+    res.status(200).json({ ok: true, user: updated });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/users/subscription/cancel', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 export default router;
 
 
