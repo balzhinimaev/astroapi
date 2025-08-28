@@ -82,6 +82,7 @@ const userSchema = new Schema(
         'solar_return',
         'lunar_return',
         'custom',
+        'romantic_personality',
         'none'
       ],
       required: false,
