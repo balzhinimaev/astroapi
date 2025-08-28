@@ -782,7 +782,7 @@ router.post('/users/active-spread/complete', requireN8nToken, async (req: Reques
     }
 
     // Очищаем активный расклад
-    updateData.activeSpread = null;
+    updateData.activeSpread = 'none';
     updateData.activeSpreadStartedAt = null;
 
     const updated = await UserModel.findOneAndUpdate(
@@ -820,7 +820,7 @@ router.post('/users/active-spread/clear', requireN8nToken, async (req: Request, 
       { telegramId: telegramIdStr },
       { 
         $set: {
-          activeSpread: null,
+          activeSpread: 'none',
           activeSpreadStartedAt: null,
           activeSpreadData: null
         }
@@ -864,7 +864,7 @@ router.post('/users/active-spread/update-data', requireN8nToken, async (req: Req
       return;
     }
 
-    if (!exists.activeSpread) {
+    if (!exists.activeSpread || exists.activeSpread === 'none') {
       res.status(400).json({ error: 'user has no active spread' });
       return;
     }

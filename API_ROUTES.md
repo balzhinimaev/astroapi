@@ -10,17 +10,19 @@
 activeSpread: {
   type: String,
   enum: [
-    'yes_no_tarot',      // Да/Нет Таро
-    'daily_horoscope',   // Ежедневный гороскоп
-    'compatibility',      // Совместимость
-    'natal_chart',       // Натальная карта
-    'transit',           // Транзиты
-    'synastry',          // Синастрия
-    'progressed',        // Прогрессии
-    'solar_return',      // Солнечное возвращение
-    'lunar_return',      // Лунное возвращение
-    'custom'             // Пользовательский расклад
-  ]
+    'yes_no_tarot',
+    'daily_horoscope',
+    'compatibility',
+    'natal_chart',
+    'transit',
+    'synastry',
+    'progressed',
+    'solar_return',
+    'lunar_return',
+    'custom',
+    'none'        // специальное значение: нет активного расклада
+  ],
+  default: 'none'
 },
 activeSpreadData: Schema.Types.Mixed,  // Произвольные данные расклада
 activeSpreadStartedAt: Date            // Время начала работы с раскладом
@@ -66,9 +68,9 @@ activeSpreadStartedAt: Date            // Время начала работы �
 
 **GET** `/n8n/users/:telegramId/active-spread`
 
-Получает информацию об активном раскладе пользователя.
+Получает информацию об активном раскладе пользователя. Если активного расклада нет, `activeSpread` будет равен строке `"none"`.
 
-**Ответ:**
+**Ответ (когда активный есть):**
 ```json
 {
   "ok": true,
@@ -79,6 +81,17 @@ activeSpreadStartedAt: Date            // Время начала работы �
     "cards": ["Колесница", "Звезда"]
   },
   "activeSpreadStartedAt": "2024-01-15T10:30:00.000Z"
+}
+```
+
+**Ответ (когда активного нет):**
+```json
+{
+  "ok": true,
+  "exists": true,
+  "activeSpread": "none",
+  "activeSpreadData": null,
+  "activeSpreadStartedAt": null
 }
 ```
 
@@ -105,7 +118,7 @@ activeSpreadStartedAt: Date            // Время начала работы �
   "ok": true,
   "user": {
     "telegramId": "123456789",
-    "activeSpread": null,
+    "activeSpread": "none",
     "activeSpreadData": {
       "question": "Стоит ли мне переезжать?",
       "cards": ["Колесница", "Звезда"],
@@ -139,7 +152,7 @@ activeSpreadStartedAt: Date            // Время начала работы �
   "ok": true,
   "user": {
     "telegramId": "123456789",
-    "activeSpread": null,
+    "activeSpread": "none",
     "activeSpreadData": null,
     "activeSpreadStartedAt": null
   }

@@ -81,9 +81,11 @@ const userSchema = new Schema(
         'progressed',
         'solar_return',
         'lunar_return',
-        'custom'
+        'custom',
+        'none'
       ],
       required: false,
+      default: 'none',
     },
     activeSpreadData: { type: Schema.Types.Mixed, required: false },
     activeSpreadStartedAt: { type: Date, required: false },
