@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { requireN8nToken } from '../middleware/authHeader';
 import { UserModel } from '../models/User';
 import { geocodePlace } from '../services/yandexGeocoder';
-import { yesNoTarot } from '../services/astrologyApi';
+import { yesNoTarot, romanticPersonalityReportTropical } from '../services/astrologyApi';
 import tzLookup from 'tz-lookup';
 
 const router = Router();
@@ -657,6 +657,87 @@ router.post('/astro/yes-no-tarot', requireN8nToken, async (req: Request, res: Re
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error in POST /n8n/astro/yes-no-tarot', error);
+    res.status(500).json({ error: 'External API error' });
+  }
+});
+
+router.post('/astro/romantic-personality', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { telegramId, house_type } = req.body as {
+      telegramId?: string | number;
+      house_type?: 'placidus' | 'koch' | 'porphyry' | 'equal_house' | string;
+    };
+
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const user = await UserModel.findOne(
+      { telegramId: telegramIdStr },
+      {
+        birthDate: 1,
+        birthHour: 1,
+        birthMinute: 1,
+        lastGeocode: 1,
+        _id: 0,
+      }
+    ).lean();
+
+    if (!user) {
+      res.status(404).json({ error: 'user not found' });
+      return;
+    }
+
+    if (!user.birthDate) {
+      res.status(400).json({ error: 'birthDate is missing' });
+      return;
+    }
+    if (user.birthHour === undefined || user.birthHour === null) {
+      res.status(400).json({ error: 'birthHour is missing' });
+      return;
+    }
+    if (user.birthMinute === undefined || user.birthMinute === null) {
+      res.status(400).json({ error: 'birthMinute is missing' });
+      return;
+    }
+    if (!user.lastGeocode || user.lastGeocode.lat === undefined || user.lastGeocode.lon === undefined) {
+      res.status(400).json({ error: 'geocode is missing (lat/lon)' });
+      return;
+    }
+    if (user.lastGeocode.tzone === undefined || user.lastGeocode.tzone === null) {
+      res.status(400).json({ error: 'tzone is missing' });
+      return;
+    }
+
+    const [yearStr, monthStr, dayStr] = String(user.birthDate).split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    const day = Number(dayStr);
+
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+      res.status(400).json({ error: 'birthDate must be in YYYY-MM-DD format' });
+      return;
+    }
+
+    const payload = {
+      day,
+      month,
+      year,
+      hour: Number(user.birthHour),
+      min: Number(user.birthMinute),
+      lat: Number(user.lastGeocode.lat),
+      lon: Number(user.lastGeocode.lon),
+      tzone: Number(user.lastGeocode.tzone),
+      house_type: house_type || 'placidus',
+    } as const;
+
+    const result = await romanticPersonalityReportTropical(payload);
+    res.status(200).json({ ok: true, payload, result });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/astro/romantic-personality', error);
     res.status(500).json({ error: 'External API error' });
   }
 });
