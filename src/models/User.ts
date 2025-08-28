@@ -83,6 +83,7 @@ const userSchema = new Schema(
         'lunar_return',
         'custom',
         'romantic_personality',
+        "karma_destiny",
         'none'
       ],
       required: false,

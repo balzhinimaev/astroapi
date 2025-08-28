@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { requireN8nToken } from '../middleware/authHeader';
 import { UserModel } from '../models/User';
 import { geocodePlace } from '../services/yandexGeocoder';
-import { yesNoTarot, romanticPersonalityReportTropical } from '../services/astrologyApi';
+import { yesNoTarot, romanticPersonalityReportTropical, karmaDestinyReportTropical } from '../services/astrologyApi';
 import tzLookup from 'tz-lookup';
 
 const router = Router();
@@ -760,6 +760,92 @@ router.post('/astro/romantic-personality', requireN8nToken, async (req: Request,
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error in POST /n8n/astro/romantic-personality', error);
+    res.status(500).json({ error: 'External API error' });
+  }
+});
+
+router.post('/astro/karma-destiny', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { telegramId, language } = req.body as {
+      telegramId?: string | number;
+      language?: string;
+    };
+
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const user = await UserModel.findOne(
+      { telegramId: telegramIdStr },
+      {
+        birthDate: 1,
+        birthHour: 1,
+        birthMinute: 1,
+        lastGeocode: 1,
+        partner: 1,
+        _id: 0,
+      }
+    ).lean();
+
+    if (!user) {
+      res.status(404).json({ error: 'user not found' });
+      return;
+    }
+
+    // Validate primary person
+    if (!user.birthDate) { res.status(400).json({ error: 'birthDate is missing' }); return; }
+    if (user.birthHour === undefined || user.birthHour === null) { res.status(400).json({ error: 'birthHour is missing' }); return; }
+    if (user.birthMinute === undefined || user.birthMinute === null) { res.status(400).json({ error: 'birthMinute is missing' }); return; }
+    if (!user.lastGeocode || user.lastGeocode.lat === undefined || user.lastGeocode.lon === undefined) { res.status(400).json({ error: 'geocode is missing (lat/lon)' }); return; }
+    if (user.lastGeocode.tzone === undefined || user.lastGeocode.tzone === null) { res.status(400).json({ error: 'tzone is missing' }); return; }
+
+    // Validate secondary (partner)
+    const partner = user.partner || {};
+    if (!partner.birthDate) { res.status(400).json({ error: 'partner.birthDate is missing' }); return; }
+    if (partner.birthHour === undefined || partner.birthHour === null) { res.status(400).json({ error: 'partner.birthHour is missing' }); return; }
+    if (partner.birthMinute === undefined || partner.birthMinute === null) { res.status(400).json({ error: 'partner.birthMinute is missing' }); return; }
+    if (!partner.geocode || partner.geocode.lat === undefined || partner.geocode.lon === undefined) { res.status(400).json({ error: 'partner.geocode is missing (lat/lon)' }); return; }
+    if (partner.geocode.tzone === undefined || partner.geocode.tzone === null) { res.status(400).json({ error: 'partner.tzone is missing' }); return; }
+
+    const normalizeDate = (input: string) => {
+      const s = String(input).trim();
+      let m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+      if (m) return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
+      m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+      if (m) return { year: Number(m[3]), month: Number(m[2]), day: Number(m[1]) };
+      return null;
+    };
+
+    const p = normalizeDate(String(user.birthDate));
+    const s = normalizeDate(String(partner.birthDate));
+    if (!p || !s) { res.status(400).json({ error: 'birthDate must be in YYYY-MM-DD or DD-MM-YYYY (also / or .) format' }); return; }
+
+    const payload = {
+      p_day: p.day,
+      p_month: p.month,
+      p_year: p.year,
+      p_hour: Number(user.birthHour),
+      p_min: Number(user.birthMinute),
+      p_lat: Number(user.lastGeocode.lat),
+      p_lon: Number(user.lastGeocode.lon),
+      p_tzone: Number(user.lastGeocode.tzone),
+      s_day: s.day,
+      s_month: s.month,
+      s_year: s.year,
+      s_hour: Number(partner.birthHour),
+      s_min: Number(partner.birthMinute),
+      s_lat: Number(partner.geocode.lat),
+      s_lon: Number(partner.geocode.lon),
+      s_tzone: Number(partner.geocode.tzone),
+    } as const;
+
+    const result = await karmaDestinyReportTropical(payload, language);
+    res.status(200).json({ ok: true, payload, result });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/astro/karma-destiny', error);
     res.status(500).json({ error: 'External API error' });
   }
 });
