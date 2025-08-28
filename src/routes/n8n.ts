@@ -711,13 +711,35 @@ router.post('/astro/romantic-personality', requireN8nToken, async (req: Request,
       return;
     }
 
-    const [yearStr, monthStr, dayStr] = String(user.birthDate).split('-');
-    const year = Number(yearStr);
-    const month = Number(monthStr);
-    const day = Number(dayStr);
+    const normalizeBirthDate = (input: string) => {
+      const s = String(input).trim();
+      let m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+      if (m) {
+        const y = Number(m[1]);
+        const mo = Number(m[2]);
+        const d = Number(m[3]);
+        return { year: y, month: mo, day: d };
+      }
+      m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+      if (m) {
+        const d = Number(m[1]);
+        const mo = Number(m[2]);
+        const y = Number(m[3]);
+        return { year: y, month: mo, day: d };
+      }
+      return null;
+    };
 
-    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
-      res.status(400).json({ error: 'birthDate must be in YYYY-MM-DD format' });
+    const parsed = normalizeBirthDate(String(user.birthDate));
+    if (!parsed || !Number.isFinite(parsed.year) || !Number.isFinite(parsed.month) || !Number.isFinite(parsed.day)) {
+      res.status(400).json({ error: 'birthDate must be in YYYY-MM-DD or DD-MM-YYYY (also / or .) format' });
+      return;
+    }
+    const { year, month, day } = parsed;
+
+    // Простая проверка диапазонов
+    if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
+      res.status(400).json({ error: 'birthDate values are out of valid range' });
       return;
     }
 
