@@ -661,6 +661,228 @@ router.post('/astro/yes-no-tarot', requireN8nToken, async (req: Request, res: Re
   }
 });
 
+// Роут для установки активного расклада
+router.post('/users/active-spread', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { 
+      telegramId, 
+      spreadType, 
+      spreadData 
+    } = req.body as { 
+      telegramId?: string | number; 
+      spreadType?: string;
+      spreadData?: any;
+    };
+
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    if (!spreadType) {
+      res.status(400).json({ error: 'spreadType is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const exists = await UserModel.findOne({ telegramId: telegramIdStr }).lean();
+    if (!exists) {
+      res.status(404).json({ error: 'user not found' });
+      return;
+    }
+
+    const updateData: any = {
+      activeSpread: spreadType,
+      activeSpreadStartedAt: new Date()
+    };
+
+    if (spreadData !== undefined) {
+      updateData.activeSpreadData = spreadData;
+    }
+
+    const updated = await UserModel.findOneAndUpdate(
+      { telegramId: telegramIdStr },
+      { $set: updateData },
+      { new: true }
+    ).lean();
+
+    res.status(200).json({ ok: true, user: updated });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/users/active-spread', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Роут для получения активного расклада пользователя
+router.get('/users/:telegramId/active-spread', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const telegramId = req.params.telegramId;
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    const user = await UserModel.findOne(
+      { telegramId: String(telegramId) },
+      { activeSpread: 1, activeSpreadData: 1, activeSpreadStartedAt: 1, telegramId: 1 }
+    ).lean();
+
+    if (!user) {
+      res.status(404).json({ ok: false, exists: false });
+      return;
+    }
+
+    res.status(200).json({
+      ok: true,
+      exists: true,
+      activeSpread: user.activeSpread || null,
+      activeSpreadData: user.activeSpreadData || null,
+      activeSpreadStartedAt: user.activeSpreadStartedAt || null
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in GET /n8n/users/:telegramId/active-spread', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Роут для завершения активного расклада
+router.post('/users/active-spread/complete', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { 
+      telegramId, 
+      resultData 
+    } = req.body as { 
+      telegramId?: string | number; 
+      resultData?: any;
+    };
+
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const exists = await UserModel.findOne({ telegramId: telegramIdStr }).lean();
+    if (!exists) {
+      res.status(404).json({ error: 'user not found' });
+      return;
+    }
+
+    // Сохраняем результат расклада в activeSpreadData перед очисткой
+    const updateData: any = {};
+    
+    if (resultData !== undefined && exists.activeSpreadData) {
+      updateData.activeSpreadData = {
+        ...exists.activeSpreadData,
+        result: resultData,
+        completedAt: new Date()
+      };
+    }
+
+    // Очищаем активный расклад
+    updateData.activeSpread = null;
+    updateData.activeSpreadStartedAt = null;
+
+    const updated = await UserModel.findOneAndUpdate(
+      { telegramId: telegramIdStr },
+      { $set: updateData },
+      { new: true }
+    ).lean();
+
+    res.status(200).json({ ok: true, user: updated });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/users/active-spread/complete', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Роут для очистки активного расклада (без сохранения результата)
+router.post('/users/active-spread/clear', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { telegramId } = req.body as { telegramId?: string | number };
+
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const exists = await UserModel.findOne({ telegramId: telegramIdStr }).lean();
+    if (!exists) {
+      res.status(404).json({ error: 'user not found' });
+      return;
+    }
+
+    const updated = await UserModel.findOneAndUpdate(
+      { telegramId: telegramIdStr },
+      { 
+        $set: {
+          activeSpread: null,
+          activeSpreadStartedAt: null,
+          activeSpreadData: null
+        }
+      },
+      { new: true }
+    ).lean();
+
+    res.status(200).json({ ok: true, user: updated });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/users/active-spread/clear', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Роут для обновления данных активного расклада
+router.post('/users/active-spread/update-data', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { 
+      telegramId, 
+      spreadData 
+    } = req.body as { 
+      telegramId?: string | number; 
+      spreadData?: any;
+    };
+
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    if (spreadData === undefined) {
+      res.status(400).json({ error: 'spreadData is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const exists = await UserModel.findOne({ telegramId: telegramIdStr }).lean();
+    if (!exists) {
+      res.status(404).json({ error: 'user not found' });
+      return;
+    }
+
+    if (!exists.activeSpread) {
+      res.status(400).json({ error: 'user has no active spread' });
+      return;
+    }
+
+    const updated = await UserModel.findOneAndUpdate(
+      { telegramId: telegramIdStr },
+      { $set: { activeSpreadData: spreadData } },
+      { new: true }
+    ).lean();
+
+    res.status(200).json({ ok: true, user: updated });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/users/active-spread/update-data', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 export default router;
 
 
