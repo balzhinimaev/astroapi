@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { requireN8nToken } from '../middleware/authHeader';
 import { UserModel } from '../models/User';
 import { geocodePlace } from '../services/yandexGeocoder';
-import { yesNoTarot, romanticPersonalityReportTropical, karmaDestinyReportTropical } from '../services/astrologyApi';
+import { yesNoTarot, romanticPersonalityReportTropical, karmaDestinyReportTropical, getMoonPhaseReportByTelegramId } from '../services/astrologyApi';
 import tzLookup from 'tz-lookup';
 
 const router = Router();
@@ -1068,6 +1068,42 @@ router.post('/users/active-spread/update-data', requireN8nToken, async (req: Req
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error in POST /n8n/users/active-spread/update-data', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Роут для получения отчета о фазах луны
+router.post('/moon-phase-report', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { telegramId, language } = req.body as { telegramId?: string | number; language?: string };
+
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const lang = language || 'russian';
+
+    try {
+      const report = await getMoonPhaseReportByTelegramId(telegramIdStr, lang);
+      res.status(200).json({ ok: true, report });
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === 'User not found') {
+          res.status(404).json({ error: 'User not found' });
+          return;
+        }
+        if (error.message.includes('User profile is incomplete')) {
+          res.status(400).json({ error: 'User profile is incomplete. Missing birth date, time, or location data.' });
+          return;
+        }
+      }
+      throw error;
+    }
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/moon-phase-report', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });

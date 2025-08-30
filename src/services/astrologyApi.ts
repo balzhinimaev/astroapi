@@ -137,4 +137,97 @@ export async function karmaDestinyReportTropical(payload: KarmaDestinyPayload, l
   return (await resp.json()) as KarmaDestinyResponse;
 }
 
+export interface MoonPhaseReportPayload {
+  day: number;
+  month: number;
+  year: number;
+  hour: number;
+  min: number;
+  lat: number;
+  lon: number;
+  tzone: number; // смещение в часах
+}
+
+export interface MoonPhaseReportResponse {
+  moon_phase_report: string[];
+}
+
+export async function getMoonPhaseReport(payload: MoonPhaseReportPayload, language = 'russian'): Promise<MoonPhaseReportResponse> {
+  const userId = process.env.ASTROLOGY_API_USER_ID;
+  const apiKey = process.env.ASTROLOGY_API_KEY;
+
+  if (!userId || !apiKey) {
+    throw new Error('Astrology API credentials are not configured');
+  }
+
+  const url = 'https://json.astrologyapi.com/v1/moon_phase_report';
+  const headers: Record<string, string> = {
+    authorization: buildBasicAuthHeader(userId, apiKey),
+    'Content-Type': 'application/json',
+    'Accept-Language': language,
+  };
+
+  const init: RequestInit = {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  };
+
+  const resp = await fetch(url, init);
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    throw new Error(`Astrology API error: ${resp.status} ${resp.statusText} ${text}`);
+  }
+  return (await resp.json()) as MoonPhaseReportResponse;
+}
+
+// Функция для получения отчета о фазах луны по telegramId пользователя
+export async function getMoonPhaseReportByTelegramId(telegramId: string, language = 'russian'): Promise<MoonPhaseReportResponse> {
+  const { UserModel } = await import('../models/User');
+  const { connectToDatabase } = await import('../config/db');
+  
+  // Подключаемся к базе данных
+  await connectToDatabase();
+  
+  // Ищем пользователя по telegramId
+  const user = await UserModel.findOne({ telegramId });
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  // Проверяем, что у пользователя есть необходимые данные
+  if (!user.birthDate || user.birthHour === undefined || user.birthMinute === undefined || !user.lastGeocode?.lat || !user.lastGeocode?.lon || user.lastGeocode?.tzone === undefined) {
+    throw new Error('User profile is incomplete. Missing birth date, time, or location data.');
+  }
+
+  // Парсим дату рождения
+  const birthDateParts = user.birthDate.split('-');
+  if (birthDateParts.length !== 3) {
+    throw new Error('Invalid birth date format');
+  }
+
+  const year = parseInt(birthDateParts[0]);
+  const month = parseInt(birthDateParts[1]);
+  const day = parseInt(birthDateParts[2]);
+
+  if (isNaN(year) || isNaN(month) || isNaN(day)) {
+    throw new Error('Invalid birth date values');
+  }
+
+  // Формируем payload для API
+  const payload: MoonPhaseReportPayload = {
+    day,
+    month,
+    year,
+    hour: user.birthHour!,
+    min: user.birthMinute!,
+    lat: user.lastGeocode.lat!,
+    lon: user.lastGeocode.lon!,
+    tzone: user.lastGeocode.tzone!,
+  };
+
+  // Вызываем API
+  return getMoonPhaseReport(payload, language);
+}
+
 
