@@ -58,6 +58,7 @@ const userSchema = new Schema(
         'awaiting_partner_birthhour',
         'awaiting_partner_birthminute',
         'awaiting_partner_city',
+        'none'
       ],
       default: 'registered',
       required: false,
