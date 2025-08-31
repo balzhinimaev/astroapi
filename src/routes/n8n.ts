@@ -1296,6 +1296,38 @@ router.get('/astro/yes-no-status', requireN8nToken, async (req: Request, res: Re
   }
 });
 
+// Роут для миграции бесплатных запросов (временно)
+router.post('/migrate/free-requests', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    // Обновляем всех пользователей, у которых freeRequests.yesNoTarot не установлено
+    const result = await UserModel.updateMany(
+      { 
+        $or: [
+          { 'freeRequests.yesNoTarot': { $exists: false } },
+          { 'freeRequests.yesNoTarot': false }
+        ]
+      },
+      { 
+        $set: { 
+          'freeRequests.yesNoTarot': true,
+          'freeRequests.personality': true
+        } 
+      }
+    );
+
+    res.status(200).json({
+      ok: true,
+      message: 'Migration completed',
+      modifiedCount: result.modifiedCount,
+      matchedCount: result.matchedCount
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/migrate/free-requests', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 export default router;
 
 

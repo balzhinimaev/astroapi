@@ -99,8 +99,8 @@ const userSchema = new Schema(
     activeSpreadStartedAt: { type: Date, required: false },
     // Отслеживание бесплатных запросов
     freeRequests: {
-      yesNoTarot: { type: Boolean, default: false, required: false },
-      personality: { type: Boolean, default: false, required: false },
+      yesNoTarot: { type: Boolean, default: true, required: false },
+      personality: { type: Boolean, default: true, required: false },
     },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },

@@ -378,16 +378,16 @@ export async function checkAndUpdateFreeRequest(telegramId: string, requestType:
 
   // Проверяем бесплатный запрос
   const freeRequests = user.freeRequests || {};
-  const hasUsedFreeRequest = freeRequests[requestType] === true;
+  const hasFreeRequest = freeRequests[requestType] === true;
 
-  if (hasUsedFreeRequest) {
+  if (!hasFreeRequest) {
     return { canUse: false, isFree: false };
   }
 
-  // Помечаем бесплатный запрос как использованный
+  // Помечаем бесплатный запрос как использованный (устанавливаем в false)
   await UserModel.findOneAndUpdate(
     { telegramId },
-    { $set: { [`freeRequests.${requestType}`]: true } }
+    { $set: { [`freeRequests.${requestType}`]: false } }
   );
 
   return { canUse: true, isFree: true };
