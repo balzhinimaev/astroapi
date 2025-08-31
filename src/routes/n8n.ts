@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { requireN8nToken } from '../middleware/authHeader';
 import { UserModel } from '../models/User';
 import { geocodePlace } from '../services/yandexGeocoder';
-import { yesNoTarot, romanticPersonalityReportTropical, personalityReportTropical, karmaDestinyReportTropical, getMoonPhaseReportByTelegramId } from '../services/astrologyApi';
+import { yesNoTarot, romanticPersonalityReportTropical, personalityReportTropical, karmaDestinyReportTropical, getMoonPhaseReportByTelegramId, checkAndUpdateFreeRequest } from '../services/astrologyApi';
 import tzLookup from 'tz-lookup';
 
 const router = Router();
@@ -649,11 +649,36 @@ router.post('/users/subscription/cancel', requireN8nToken, async (req: Request, 
 
 router.post('/astro/yes-no-tarot', requireN8nToken, async (req: Request, res: Response) => {
   try {
-    const { language } = req.body as { language?: string };
+    const { telegramId, language } = req.body as { telegramId?: string | number; language?: string };
+
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+
+    // Проверяем и обновляем бесплатный запрос
+    const { canUse, isFree } = await checkAndUpdateFreeRequest(telegramIdStr, 'yesNoTarot');
+    
+    if (!canUse) {
+      res.status(403).json({ 
+        error: 'Free request limit exceeded. Please subscribe to continue using this feature.',
+        limitExceeded: true 
+      });
+      return;
+    }
+
     const randomTarotId = Math.floor(Math.random() * 22) + 1; // 1..22
     const lang = (language && String(language).trim()) || 'russian';
     const response = await yesNoTarot(randomTarotId, lang);
-    res.status(200).json({ ok: true, tarotId: randomTarotId, result: response });
+    
+    res.status(200).json({ 
+      ok: true, 
+      tarotId: randomTarotId, 
+      result: response,
+      isFreeRequest: isFree 
+    });
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error in POST /n8n/astro/yes-no-tarot', error);
@@ -778,6 +803,18 @@ router.post('/astro/personality', requireN8nToken, async (req: Request, res: Res
     }
 
     const telegramIdStr = String(telegramId);
+
+    // Проверяем и обновляем бесплатный запрос
+    const { canUse, isFree } = await checkAndUpdateFreeRequest(telegramIdStr, 'personality');
+    
+    if (!canUse) {
+      res.status(403).json({ 
+        error: 'Free request limit exceeded. Please subscribe to continue using this feature.',
+        limitExceeded: true 
+      });
+      return;
+    }
+
     const user = await UserModel.findOne(
       { telegramId: telegramIdStr },
       {
@@ -834,7 +871,12 @@ router.post('/astro/personality', requireN8nToken, async (req: Request, res: Res
     } as const;
 
     const result = await personalityReportTropical(payload, language);
-    res.status(200).json({ ok: true, payload, result });
+    res.status(200).json({ 
+      ok: true, 
+      payload, 
+      result,
+      isFreeRequest: isFree 
+    });
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error in POST /n8n/astro/personality', error);

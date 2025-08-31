@@ -354,4 +354,43 @@ export async function getMoonPhaseReportByTelegramId(telegramId: string, languag
   return getMoonPhaseReport(payload, language);
 }
 
+// Функция для проверки и обновления бесплатных запросов
+export async function checkAndUpdateFreeRequest(telegramId: string, requestType: 'yesNoTarot' | 'personality'): Promise<{ canUse: boolean; isFree: boolean }> {
+  const { UserModel } = require('../models/User');
+  const { connectToDatabase } = require('../config/db');
+  
+  await connectToDatabase();
+  
+  const user = await UserModel.findOne({ telegramId });
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  // Проверяем подписку
+  const now = new Date();
+  const subscription = user.subscription || {};
+  const isSubscriptionActive = subscription.status === 'active' && 
+    (!subscription.endDate || subscription.endDate >= now);
+
+  if (isSubscriptionActive) {
+    return { canUse: true, isFree: false };
+  }
+
+  // Проверяем бесплатный запрос
+  const freeRequests = user.freeRequests || {};
+  const hasUsedFreeRequest = freeRequests[requestType] === true;
+
+  if (hasUsedFreeRequest) {
+    return { canUse: false, isFree: false };
+  }
+
+  // Помечаем бесплатный запрос как использованный
+  await UserModel.findOneAndUpdate(
+    { telegramId },
+    { $set: { [`freeRequests.${requestType}`]: true } }
+  );
+
+  return { canUse: true, isFree: true };
+}
+
 
