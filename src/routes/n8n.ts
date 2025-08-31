@@ -1103,6 +1103,14 @@ router.post('/moon-phase-report', requireN8nToken, async (req: Request, res: Res
           res.status(400).json({ error: 'User profile is incomplete. Missing birth date, time, or location data.' });
           return;
         }
+        if (error.message.includes('Invalid birth date format')) {
+          res.status(400).json({ error: error.message });
+          return;
+        }
+        if (error.message.includes('Invalid birth date values') || error.message.includes('Birth date values are out of valid range')) {
+          res.status(400).json({ error: 'Invalid birth date values. Please check the date format and values.' });
+          return;
+        }
         if (error.message.includes('Astrology API credentials are not configured')) {
           res.status(500).json({ error: 'Astrology API is not configured properly' });
           return;

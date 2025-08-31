@@ -220,18 +220,75 @@ export async function getMoonPhaseReportByTelegramId(telegramId: string, languag
     throw new Error('User profile is incomplete. Missing birth date, time, or location data.');
   }
 
+  // Функция для нормализации даты рождения
+  const normalizeBirthDate = (input: string) => {
+    const s = String(input).trim();
+    
+    // Формат YYYY-MM-DD
+    let m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+    if (m) {
+      const y = Number(m[1]);
+      const mo = Number(m[2]);
+      const d = Number(m[3]);
+      return { year: y, month: mo, day: d };
+    }
+    
+    // Формат DD-MM-YYYY или DD/MM/YYYY
+    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+    if (m) {
+      const d = Number(m[1]);
+      const mo = Number(m[2]);
+      const y = Number(m[3]);
+      return { year: y, month: mo, day: d };
+    }
+    
+    // Формат MM-DD-YYYY или MM/DD/YYYY
+    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+    if (m) {
+      const mo = Number(m[1]);
+      const d = Number(m[2]);
+      const y = Number(m[3]);
+      return { year: y, month: mo, day: d };
+    }
+    
+    // Формат DD.MM.YYYY
+    m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (m) {
+      const d = Number(m[1]);
+      const mo = Number(m[2]);
+      const y = Number(m[3]);
+      return { year: y, month: mo, day: d };
+    }
+    
+    // Формат YYYY.MM.DD
+    m = s.match(/^(\d{4})\.(\d{1,2})\.(\d{1,2})$/);
+    if (m) {
+      const y = Number(m[1]);
+      const mo = Number(m[2]);
+      const d = Number(m[3]);
+      return { year: y, month: mo, day: d };
+    }
+    
+    return null;
+  };
+
   // Парсим дату рождения
-  const birthDateParts = user.birthDate.split('-');
-  if (birthDateParts.length !== 3) {
-    throw new Error('Invalid birth date format');
+  const parsed = normalizeBirthDate(user.birthDate);
+  if (!parsed) {
+    console.error(`[Moon Phase Report] Invalid birth date format for user ${telegramId}: ${user.birthDate}`);
+    throw new Error(`Invalid birth date format: ${user.birthDate}. Expected formats: YYYY-MM-DD, DD-MM-YYYY, DD.MM.YYYY, etc.`);
   }
 
-  const year = parseInt(birthDateParts[0]);
-  const month = parseInt(birthDateParts[1]);
-  const day = parseInt(birthDateParts[2]);
+  const { year, month, day } = parsed;
 
+  // Проверяем валидность значений
   if (isNaN(year) || isNaN(month) || isNaN(day)) {
     throw new Error('Invalid birth date values');
+  }
+
+  // Проверяем диапазоны
+  if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
+    throw new Error('Birth date values are out of valid range');
   }
 
   // Формируем payload для API
