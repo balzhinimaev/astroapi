@@ -83,6 +83,53 @@ export async function romanticPersonalityReportTropical(payload: RomanticPersona
   return (await resp.json()) as RomanticPersonalityResponse;
 }
 
+export interface PersonalityPayload {
+  day: number;
+  month: number;
+  year: number;
+  hour: number;
+  min: number;
+  lat: number;
+  lon: number;
+  tzone: number; // смещение в часах
+  house_type?: 'placidus' | 'koch' | 'porphyry' | 'equal_house' | string;
+}
+
+export interface PersonalityResponse {
+  report: string[];
+  spiritual_lesson: string;
+  key_quality: string;
+}
+
+export async function personalityReportTropical(payload: PersonalityPayload, language = 'russian'): Promise<PersonalityResponse> {
+  const userId = process.env.ASTROLOGY_API_USER_ID;
+  const apiKey = process.env.ASTROLOGY_API_KEY;
+
+  if (!userId || !apiKey) {
+    throw new Error('Astrology API credentials are not configured');
+  }
+
+  const url = 'https://json.astrologyapi.com/v1/personality_report/tropical';
+  const headers: Record<string, string> = {
+    authorization: buildBasicAuthHeader(userId, apiKey),
+    'Content-Type': 'application/json',
+    'Accept-Language': language,
+  };
+
+  const init: RequestInit = {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  };
+
+  const resp = await fetch(url, init);
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    throw new Error(`Astrology API error: ${resp.status} ${resp.statusText} ${text}`);
+  }
+  return (await resp.json()) as PersonalityResponse;
+}
+
 export interface KarmaDestinyPayload {
   p_day: number;
   p_month: number;

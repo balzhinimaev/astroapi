@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { requireN8nToken } from '../middleware/authHeader';
 import { UserModel } from '../models/User';
 import { geocodePlace } from '../services/yandexGeocoder';
-import { yesNoTarot, romanticPersonalityReportTropical, karmaDestinyReportTropical, getMoonPhaseReportByTelegramId } from '../services/astrologyApi';
+import { yesNoTarot, romanticPersonalityReportTropical, personalityReportTropical, karmaDestinyReportTropical, getMoonPhaseReportByTelegramId } from '../services/astrologyApi';
 import tzLookup from 'tz-lookup';
 
 const router = Router();
@@ -760,6 +760,84 @@ router.post('/astro/romantic-personality', requireN8nToken, async (req: Request,
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error in POST /n8n/astro/romantic-personality', error);
+    res.status(500).json({ error: 'External API error' });
+  }
+});
+
+router.post('/astro/personality', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { telegramId, language, house_type } = req.body as {
+      telegramId?: string | number;
+      language?: string;
+      house_type?: string;
+    };
+
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const user = await UserModel.findOne(
+      { telegramId: telegramIdStr },
+      {
+        birthDate: 1,
+        birthHour: 1,
+        birthMinute: 1,
+        lastGeocode: 1,
+        _id: 0,
+      }
+    ).lean();
+
+    if (!user) {
+      res.status(404).json({ error: 'user not found' });
+      return;
+    }
+
+    // Validate required fields
+    if (!user.birthDate) { res.status(400).json({ error: 'birthDate is missing' }); return; }
+    if (user.birthHour === undefined || user.birthHour === null) { res.status(400).json({ error: 'birthHour is missing' }); return; }
+    if (user.birthMinute === undefined || user.birthMinute === null) { res.status(400).json({ error: 'birthMinute is missing' }); return; }
+    if (!user.lastGeocode || user.lastGeocode.lat === undefined || user.lastGeocode.lon === undefined) { res.status(400).json({ error: 'geocode is missing (lat/lon)' }); return; }
+    if (user.lastGeocode.tzone === undefined || user.lastGeocode.tzone === null) { res.status(400).json({ error: 'tzone is missing' }); return; }
+
+    const normalizeDate = (input: string) => {
+      const s = String(input).trim();
+      let m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+      if (m) return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
+      m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+      if (m) return { year: Number(m[3]), month: Number(m[2]), day: Number(m[1]) };
+      return null;
+    };
+
+    const parsed = normalizeDate(String(user.birthDate));
+    if (!parsed) { res.status(400).json({ error: 'birthDate must be in YYYY-MM-DD or DD-MM-YYYY (also / or .) format' }); return; }
+
+    const { year, month, day } = parsed;
+
+    // Простая проверка диапазонов
+    if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
+      res.status(400).json({ error: 'birthDate values are out of valid range' });
+      return;
+    }
+
+    const payload = {
+      day,
+      month,
+      year,
+      hour: Number(user.birthHour),
+      min: Number(user.birthMinute),
+      lat: Number(user.lastGeocode.lat),
+      lon: Number(user.lastGeocode.lon),
+      tzone: Number(user.lastGeocode.tzone),
+      house_type: house_type || 'placidus',
+    } as const;
+
+    const result = await personalityReportTropical(payload, language);
+    res.status(200).json({ ok: true, payload, result });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/astro/personality', error);
     res.status(500).json({ error: 'External API error' });
   }
 });
