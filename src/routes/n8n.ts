@@ -1249,6 +1249,53 @@ router.post('/moon-phase-report', requireN8nToken, async (req: Request, res: Res
   }
 });
 
+// Роут для проверки доступности бесплатного запроса на да-нет
+router.get('/astro/yes-no-status', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { telegramId } = req.query as { telegramId?: string | number };
+    
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required as query parameter' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const user = await UserModel.findOne(
+      { telegramId: telegramIdStr },
+      { 
+        'freeRequests.yesNoTarot': 1, 
+        'subscription.status': 1,
+        telegramId: 1,
+        _id: 0 
+      }
+    ).lean();
+
+    if (!user) {
+      res.status(404).json({ error: 'user not found' });
+      return;
+    }
+
+    const hasFreeRequest = user.freeRequests?.yesNoTarot === true;
+    const hasActiveSubscription = user.subscription?.status === 'active';
+    const canUse = hasFreeRequest || hasActiveSubscription;
+
+    res.status(200).json({
+      ok: true,
+      telegramId: telegramIdStr,
+      hasFreeRequest,
+      hasActiveSubscription,
+      canUse,
+      message: canUse 
+        ? 'Yes-No Tarot is available' 
+        : 'Yes-No Tarot requires subscription or free request'
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in GET /n8n/astro/yes-no-status', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 export default router;
 
 
