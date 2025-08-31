@@ -173,18 +173,38 @@ export async function getMoonPhaseReport(payload: MoonPhaseReportPayload, langua
     body: JSON.stringify(payload),
   };
 
-  const resp = await fetch(url, init);
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => '');
-    throw new Error(`Astrology API error: ${resp.status} ${resp.statusText} ${text}`);
+  try {
+    console.log(`[Moon Phase API] Calling external API with payload:`, payload);
+    const resp = await fetch(url, init);
+    
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      console.error(`[Moon Phase API] External API error: ${resp.status} ${resp.statusText}`, text);
+      throw new Error(`Astrology API error: ${resp.status} ${resp.statusText} ${text}`);
+    }
+    
+    const result = await resp.json();
+    console.log(`[Moon Phase API] Success response:`, result);
+    return result as MoonPhaseReportResponse;
+  } catch (error) {
+    console.error(`[Moon Phase API] Fetch error:`, error);
+    throw error;
   }
-  return (await resp.json()) as MoonPhaseReportResponse;
 }
 
 // Функция для получения отчета о фазах луны по telegramId пользователя
 export async function getMoonPhaseReportByTelegramId(telegramId: string, language = 'russian'): Promise<MoonPhaseReportResponse> {
-  const { UserModel } = await import('../models/User');
-  const { connectToDatabase } = await import('../config/db');
+  // Проверяем переменные окружения
+  const userId = process.env.ASTROLOGY_API_USER_ID;
+  const apiKey = process.env.ASTROLOGY_API_KEY;
+
+  if (!userId || !apiKey) {
+    throw new Error('Astrology API credentials are not configured');
+  }
+
+  // Используем статические импорты вместо динамических
+  const { UserModel } = require('../models/User');
+  const { connectToDatabase } = require('../config/db');
   
   // Подключаемся к базе данных
   await connectToDatabase();

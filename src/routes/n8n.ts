@@ -1085,10 +1085,15 @@ router.post('/moon-phase-report', requireN8nToken, async (req: Request, res: Res
     const telegramIdStr = String(telegramId);
     const lang = language || 'russian';
 
+    console.log(`[Moon Phase Report] Request for telegramId: ${telegramIdStr}, language: ${lang}`);
+
     try {
       const report = await getMoonPhaseReportByTelegramId(telegramIdStr, lang);
+      console.log(`[Moon Phase Report] Success for telegramId: ${telegramIdStr}`);
       res.status(200).json({ ok: true, report });
     } catch (error) {
+      console.error(`[Moon Phase Report] Error for telegramId ${telegramIdStr}:`, error);
+      
       if (error instanceof Error) {
         if (error.message === 'User not found') {
           res.status(404).json({ error: 'User not found' });
@@ -1096,6 +1101,14 @@ router.post('/moon-phase-report', requireN8nToken, async (req: Request, res: Res
         }
         if (error.message.includes('User profile is incomplete')) {
           res.status(400).json({ error: 'User profile is incomplete. Missing birth date, time, or location data.' });
+          return;
+        }
+        if (error.message.includes('Astrology API credentials are not configured')) {
+          res.status(500).json({ error: 'Astrology API is not configured properly' });
+          return;
+        }
+        if (error.message.includes('Astrology API error')) {
+          res.status(500).json({ error: 'External astrology API error' });
           return;
         }
       }
