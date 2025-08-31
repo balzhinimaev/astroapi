@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { requireN8nToken } from '../middleware/authHeader';
 import { UserModel } from '../models/User';
 import { geocodePlace } from '../services/yandexGeocoder';
-import { yesNoTarot, romanticPersonalityReportTropical, personalityReportTropical, karmaDestinyReportTropical, getMoonPhaseReportByTelegramId, checkAndUpdateFreeRequest } from '../services/astrologyApi';
+import { yesNoTarot, romanticPersonalityReportTropical, personalityReportTropical, karmaDestinyReportTropical, getMoonPhaseReportByTelegramId, checkAndUpdateFreeRequest, tarotPredictions } from '../services/astrologyApi';
 import tzLookup from 'tz-lookup';
 
 const router = Router();
@@ -1325,6 +1325,34 @@ router.post('/migrate/free-requests', requireN8nToken, async (req: Request, res:
     // eslint-disable-next-line no-console
     console.error('Error in POST /n8n/migrate/free-requests', error);
     res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Роут для получения предсказаний таро (любовь, карьера, финансы)
+router.post('/astro/tarot-predictions', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { telegramId, language } = req.body as { telegramId?: string | number; language?: string };
+
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const lang = (language && String(language).trim()) || 'russian';
+
+    // Получаем предсказания таро с случайными значениями
+    const predictions = await tarotPredictions(lang);
+    
+    res.status(200).json({ 
+      ok: true, 
+      predictions,
+      language: lang
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/astro/tarot-predictions', error);
+    res.status(500).json({ error: 'External API error' });
   }
 });
 

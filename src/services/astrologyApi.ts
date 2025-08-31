@@ -184,6 +184,53 @@ export async function karmaDestinyReportTropical(payload: KarmaDestinyPayload, l
   return (await resp.json()) as KarmaDestinyResponse;
 }
 
+export interface TarotPredictionsPayload {
+  love: number;
+  career: number;
+  finance: number;
+}
+
+export interface TarotPredictionsResponse {
+  love: string;
+  career: string;
+  finance: string;
+}
+
+export async function tarotPredictions(language = 'russian'): Promise<TarotPredictionsResponse> {
+  const userId = process.env.ASTROLOGY_API_USER_ID;
+  const apiKey = process.env.ASTROLOGY_API_KEY;
+
+  if (!userId || !apiKey) {
+    throw new Error('Astrology API credentials are not configured');
+  }
+
+  // Генерируем случайные значения для love, career, finance (1-78)
+  const love = Math.floor(Math.random() * 78) + 1;
+  const career = Math.floor(Math.random() * 78) + 1;
+  const finance = Math.floor(Math.random() * 78) + 1;
+
+  const url = 'https://json.astrologyapi.com/v1/tarot_predictions';
+  const headers: Record<string, string> = {
+    authorization: buildBasicAuthHeader(userId, apiKey),
+    'Content-Type': 'application/json',
+    'Accept-Language': language,
+  };
+
+  const body = JSON.stringify({ love, career, finance });
+  const init: RequestInit = {
+    method: 'POST',
+    headers,
+    body,
+  };
+
+  const resp = await fetch(url, init);
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    throw new Error(`Astrology API error: ${resp.status} ${resp.statusText} ${text}`);
+  }
+  return (await resp.json()) as TarotPredictionsResponse;
+}
+
 export interface MoonPhaseReportPayload {
   day: number;
   month: number;
