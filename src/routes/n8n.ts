@@ -1357,6 +1357,115 @@ router.post('/astro/tarot-predictions', requireN8nToken, async (req: Request, re
   }
 });
 
+// Роут для сброса заполненных данных пользователя
+router.post('/users/reset-data', requireN8nToken, async (req: Request, res: Response) => {
+  try {
+    const { telegramId, resetType } = req.body as { 
+      telegramId?: string | number; 
+      resetType?: 'profile' | 'partner' | 'location' | 'all' 
+    };
+
+    if (!telegramId) {
+      res.status(400).json({ error: 'telegramId is required' });
+      return;
+    }
+
+    const telegramIdStr = String(telegramId);
+    const resetTypeValue = resetType || 'all';
+
+    // Проверяем существование пользователя
+    const existingUser = await UserModel.findOne({ telegramId: telegramIdStr }).lean();
+    if (!existingUser) {
+      res.status(404).json({ error: 'user not found' });
+      return;
+    }
+
+    let updateFields: any = {};
+
+    switch (resetTypeValue) {
+      case 'profile':
+        // Сброс только профиля пользователя
+        updateFields = {
+          name: undefined,
+          birthDate: undefined,
+          birthHour: undefined,
+          birthMinute: undefined,
+          isProfileComplete: false,
+          status: 'awaiting_name',
+          statusUpdatedAt: new Date()
+        };
+        break;
+
+      case 'partner':
+        // Сброс только данных партнера
+        updateFields = {
+          'partner.birthDate': undefined,
+          'partner.birthHour': undefined,
+          'partner.birthMinute': undefined,
+          'partner.geocode': undefined,
+          status: 'awaiting_partner_name',
+          statusUpdatedAt: new Date()
+        };
+        break;
+
+      case 'location':
+        // Сброс только геолокации
+        updateFields = {
+          lastGeocode: undefined,
+          status: 'awaiting_city',
+          statusUpdatedAt: new Date()
+        };
+        break;
+
+      case 'all':
+      default:
+        // Полный сброс всех данных (кроме telegramId, subscription и freeRequests)
+        updateFields = {
+          name: undefined,
+          birthDate: undefined,
+          birthHour: undefined,
+          birthMinute: undefined,
+          isProfileComplete: false,
+          'partner.birthDate': undefined,
+          'partner.birthHour': undefined,
+          'partner.birthMinute': undefined,
+          'partner.geocode': undefined,
+          lastGeocode: undefined,
+          activeSpread: 'none',
+          activeSpreadData: undefined,
+          activeSpreadStartedAt: undefined,
+          status: 'awaiting_name',
+          statusUpdatedAt: new Date()
+        };
+        break;
+    }
+
+    // Удаляем undefined поля из объекта
+    const cleanUpdateFields = Object.fromEntries(
+      Object.entries(updateFields).filter(([_, value]) => value !== undefined)
+    );
+
+    // Обновляем пользователя
+    const updatedUser = await UserModel.findOneAndUpdate(
+      { telegramId: telegramIdStr },
+      { $unset: cleanUpdateFields },
+      { new: true }
+    ).lean();
+
+    res.status(200).json({
+      ok: true,
+      message: `Data reset successful for type: ${resetTypeValue}`,
+      resetType: resetTypeValue,
+      user: updatedUser
+    });
+
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in POST /n8n/users/reset-data', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 export default router;
 
 
