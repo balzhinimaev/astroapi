@@ -1373,6 +1373,15 @@ router.post('/users/reset-data', requireN8nToken, async (req: Request, res: Resp
     const telegramIdStr = String(telegramId);
     const resetTypeValue = resetType || 'all';
 
+    // Валидация resetType
+    const validResetTypes = ['profile', 'partner', 'location', 'all'];
+    if (!validResetTypes.includes(resetTypeValue)) {
+      res.status(400).json({ 
+        error: `Invalid resetType. Must be one of: ${validResetTypes.join(', ')}` 
+      });
+      return;
+    }
+
     // Проверяем существование пользователя
     const existingUser = await UserModel.findOne({ telegramId: telegramIdStr }).lean();
     if (!existingUser) {
@@ -1380,16 +1389,19 @@ router.post('/users/reset-data', requireN8nToken, async (req: Request, res: Resp
       return;
     }
 
-    let updateFields: any = {};
+    let unsetFields: any = {};
+    let setFields: any = {};
 
     switch (resetTypeValue) {
       case 'profile':
         // Сброс только профиля пользователя
-        updateFields = {
-          name: undefined,
-          birthDate: undefined,
-          birthHour: undefined,
-          birthMinute: undefined,
+        unsetFields = {
+          name: 1,
+          birthDate: 1,
+          birthHour: 1,
+          birthMinute: 1
+        };
+        setFields = {
           isProfileComplete: false,
           status: 'awaiting_name',
           statusUpdatedAt: new Date()
@@ -1398,11 +1410,13 @@ router.post('/users/reset-data', requireN8nToken, async (req: Request, res: Resp
 
       case 'partner':
         // Сброс только данных партнера
-        updateFields = {
-          'partner.birthDate': undefined,
-          'partner.birthHour': undefined,
-          'partner.birthMinute': undefined,
-          'partner.geocode': undefined,
+        unsetFields = {
+          'partner.birthDate': 1,
+          'partner.birthHour': 1,
+          'partner.birthMinute': 1,
+          'partner.geocode': 1
+        };
+        setFields = {
           status: 'awaiting_partner_name',
           statusUpdatedAt: new Date()
         };
@@ -1410,8 +1424,10 @@ router.post('/users/reset-data', requireN8nToken, async (req: Request, res: Resp
 
       case 'location':
         // Сброс только геолокации
-        updateFields = {
-          lastGeocode: undefined,
+        unsetFields = {
+          lastGeocode: 1
+        };
+        setFields = {
           status: 'awaiting_city',
           statusUpdatedAt: new Date()
         };
@@ -1419,38 +1435,57 @@ router.post('/users/reset-data', requireN8nToken, async (req: Request, res: Resp
 
       case 'all':
       default:
-        // Полный сброс всех данных (кроме telegramId, subscription и freeRequests)
-        updateFields = {
-          name: undefined,
-          birthDate: undefined,
-          birthHour: undefined,
-          birthMinute: undefined,
+        // Полный сброс всех данных (кроме telegramId, subscription, freeRequests, createdAt, updatedAt)
+        unsetFields = {
+          name: 1,
+          birthDate: 1,
+          birthHour: 1,
+          birthMinute: 1,
+          'partner.birthDate': 1,
+          'partner.birthHour': 1,
+          'partner.birthMinute': 1,
+          'partner.geocode': 1,
+          lastGeocode: 1,
+          activeSpreadData: 1,
+          activeSpreadStartedAt: 1
+        };
+        setFields = {
           isProfileComplete: false,
-          'partner.birthDate': undefined,
-          'partner.birthHour': undefined,
-          'partner.birthMinute': undefined,
-          'partner.geocode': undefined,
-          lastGeocode: undefined,
           activeSpread: 'none',
-          activeSpreadData: undefined,
-          activeSpreadStartedAt: undefined,
           status: 'awaiting_name',
           statusUpdatedAt: new Date()
         };
         break;
     }
 
-    // Удаляем undefined поля из объекта
-    const cleanUpdateFields = Object.fromEntries(
-      Object.entries(updateFields).filter(([_, value]) => value !== undefined)
-    );
+    // Обновляем пользователя с использованием $unset и $set
+    const updateOperation: any = {};
+    if (Object.keys(unsetFields).length > 0) {
+      updateOperation.$unset = unsetFields;
+    }
+    if (Object.keys(setFields).length > 0) {
+      updateOperation.$set = setFields;
+    }
 
-    // Обновляем пользователя
+    // Проверяем, что есть что обновлять
+    if (Object.keys(updateOperation).length === 0) {
+      res.status(400).json({ 
+        error: 'No fields to update for the specified reset type' 
+      });
+      return;
+    }
+
+    // Логируем операцию для отладки
+    console.log(`[Reset Data] telegramId: ${telegramIdStr}, resetType: ${resetTypeValue}`);
+    console.log(`[Reset Data] Update operation:`, JSON.stringify(updateOperation, null, 2));
+
     const updatedUser = await UserModel.findOneAndUpdate(
       { telegramId: telegramIdStr },
-      { $unset: cleanUpdateFields },
+      updateOperation,
       { new: true }
     ).lean();
+
+    console.log(`[Reset Data] Updated user:`, JSON.stringify(updatedUser, null, 2));
 
     res.status(200).json({
       ok: true,
@@ -1467,6 +1502,3 @@ router.post('/users/reset-data', requireN8nToken, async (req: Request, res: Resp
 });
 
 export default router;
-
-
-
