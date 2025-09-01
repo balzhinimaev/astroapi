@@ -568,7 +568,7 @@ router.get('/users/:telegramId/subscription', requireN8nToken, async (req: Reque
 
     const user = await UserModel.findOne(
       { telegramId: String(telegramId) },
-      { subscription: 1, telegramId: 1 }
+      { subscription: 1, telegramId: 1, status: 1 }
     ).lean();
 
     if (!user) {
@@ -591,6 +591,7 @@ router.get('/users/:telegramId/subscription', requireN8nToken, async (req: Reque
     res.status(200).json({
       ok: true,
       exists: true,
+      user: { status: user.status },
       subscription: {
         status: subscription.status || 'inactive',
         startDate: subscription.startDate,
